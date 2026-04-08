@@ -1,0 +1,189 @@
+/* ═══════════════════════════════════════════
+   IRL_Window — Windows 95 Design System
+   ═══════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+
+:root {
+  /* Win95 core palette */
+  --w95-desktop:    #008080;
+  --w95-gray:       #c0c0c0;
+  --w95-dark-gray:  #808080;
+  --w95-black:      #000000;
+  --w95-white:      #ffffff;
+  --w95-navy:       #000080;
+  --w95-blue:       #1084d0;
+  --w95-yellow:     #ffff00;
+
+  /* Bevel: 2-tone raised */
+  --bevel-tl:       #ffffff;  /* top & left highlight */
+  --bevel-br:       #808080;  /* bottom & right shadow */
+  --bevel-outer-br: #000000;  /* outer dark edge */
+
+  /* Title bar gradient */
+  --titlebar-active:   linear-gradient(90deg, #000080 0%, #1084d0 100%);
+  --titlebar-inactive: linear-gradient(90deg, #808080 0%, #b0b0b0 100%);
+
+  /* Text */
+  --text-on-gray:   #000000;
+  --text-on-title:  #ffffff;
+  --text-dim:       #808080;
+  --text-link:      #000080;
+
+  /* Functional aliases for components */
+  --accent:         var(--w95-navy);
+  --green:          #00aa00;
+  --red:            #cc0000;
+
+  /* Fonts */
+  --font-pixel:     'VT323', 'Courier New', monospace;
+  --font-mono:      'Share Tech Mono', 'Courier New', Courier, monospace;
+  --font-ui:        'Share Tech Mono', 'Courier New', Courier, monospace;
+
+  --radius:     0px;
+  --radius-lg:  0px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+
+body {
+  background: var(--w95-desktop);
+  color: var(--text-on-gray);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.4;
+  /* subtle desktop texture */
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+
+/* ── Bevel utilities ──────────────────────────────── */
+.raised {
+  border: 2px solid;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl);
+  box-shadow: inset 1px 1px 0 var(--w95-white), inset -1px -1px 0 var(--bevel-br);
+}
+.sunken {
+  border: 2px solid;
+  border-color: var(--bevel-outer-br) var(--bevel-tl) var(--bevel-tl) var(--bevel-outer-br);
+  box-shadow: inset 1px 1px 0 var(--bevel-br), inset -1px -1px 0 var(--w95-white);
+}
+.panel {
+  background: var(--w95-gray);
+  border: 2px solid;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl);
+  box-shadow: inset 1px 1px 0 var(--w95-white), inset -1px -1px 0 var(--bevel-br);
+}
+
+/* ── Scrollbars ──────────────────────────────────── */
+::-webkit-scrollbar { width: 16px; height: 16px; }
+::-webkit-scrollbar-track {
+  background: var(--w95-gray);
+  border-left: 1px solid var(--bevel-br);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--w95-gray);
+  border: 2px solid;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl);
+  box-shadow: inset 1px 1px 0 var(--w95-white);
+}
+::-webkit-scrollbar-button {
+  background: var(--w95-gray);
+  border: 2px solid;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl);
+  display: block;
+  height: 16px;
+  width: 16px;
+}
+
+/* ── Buttons ─────────────────────────────────────── */
+button {
+  cursor: default;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  background: var(--w95-gray);
+  color: var(--text-on-gray);
+  border: 2px solid;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl);
+  box-shadow: inset 1px 1px 0 var(--w95-white), inset -1px -1px 0 var(--bevel-br);
+  padding: 3px 10px;
+  min-width: 75px;
+  text-align: center;
+}
+button:hover { background: #d4d0c8; }
+button:active {
+  border-color: var(--bevel-outer-br) var(--bevel-tl) var(--bevel-tl) var(--bevel-outer-br);
+  box-shadow: inset 1px 1px 0 var(--bevel-br), inset -1px -1px 0 var(--w95-white);
+  padding: 4px 9px 2px 11px;
+}
+button:disabled { color: var(--bevel-br); cursor: default; }
+
+/* ── Inputs ──────────────────────────────────────── */
+input, textarea, select {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-on-gray);
+  background: var(--w95-white);
+  border: 2px solid;
+  border-color: var(--bevel-outer-br) var(--bevel-tl) var(--bevel-tl) var(--bevel-outer-br);
+  box-shadow: inset 1px 1px 0 var(--bevel-br);
+  padding: 2px 4px;
+  outline: none;
+}
+input:focus, textarea:focus {
+  outline: 1px dotted var(--w95-black);
+  outline-offset: -3px;
+}
+
+/* ── React Flow overrides ────────────────────────── */
+.react-flow { background: var(--w95-desktop) !important; }
+.react-flow__background { display: none !important; }
+
+.react-flow__controls {
+  background: var(--w95-gray) !important;
+  border: 2px solid !important;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl) !important;
+  box-shadow: inset 1px 1px 0 var(--w95-white), inset -1px -1px 0 var(--bevel-br) !important;
+  border-radius: 0 !important;
+}
+.react-flow__controls-button {
+  background: var(--w95-gray) !important;
+  border: 2px solid !important;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl) !important;
+  border-radius: 0 !important;
+  color: var(--text-on-gray) !important;
+  fill: var(--text-on-gray) !important;
+  width: 22px !important;
+  height: 22px !important;
+  box-shadow: inset 1px 1px 0 var(--w95-white) !important;
+}
+.react-flow__controls-button:hover { background: #d4d0c8 !important; }
+
+.react-flow__minimap {
+  background: var(--w95-gray) !important;
+  border: 2px solid !important;
+  border-color: var(--bevel-tl) var(--bevel-outer-br) var(--bevel-outer-br) var(--bevel-tl) !important;
+  border-radius: 0 !important;
+}
+
+.react-flow__edge-path {
+  stroke: var(--w95-black) !important;
+  stroke-width: 1.5 !important;
+}
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5 !important;
+  animation: dashdraw 0.5s linear infinite !important;
+}
+@keyframes dashdraw { to { stroke-dashoffset: -10; } }
+
+.react-flow__handle {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 0 !important;
+  border: 2px solid var(--bevel-outer-br) !important;
+  background: var(--w95-gray) !important;
+  box-shadow: inset 1px 1px 0 var(--w95-white) !important;
+}
+.react-flow__node { border-radius: 0 !important; padding: 0 !important; background: none !important; border: none !important; box-shadow: none !important; }
+.react-flow__node.selected > * { outline: 1px dotted var(--w95-black); outline-offset: 2px; }

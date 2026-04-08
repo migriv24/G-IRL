@@ -1,0 +1,53 @@
+#technology #software #abstract #tech_project 
+Name of project G-IRL (girl)
+Short for: Goals In Real Life
+a bit of an odd one, but will essentially be an IRL RPG stats thing, aimed at accomplishing GOALS.
+
+An all in one tracking and statistics thing for one self.
+Fitness apps have statistics to track your fitness levels, for the goal of being fit.
+Meditation or mental health apps have a whole thing about being mentally healthy and such.
+Finance tracking apps are for getting more financially stable.
+
+But what about any abstract goal? 
+Or more specifically, getting a girlfriend.
+
+Getting a girlfriend is an extremely abstract and non-linear goal.
+Also, I want this to be RPG inspired. here's how:
+1. a user makes an account with a pixelated 16x16 avatar
+2. a user has a username, not their real name
+3. user does a 'avatar setup' where they are examined on various "axis"
+	1. some sort of personality test with the 16 personalities
+	2. a mini knowledge test (maybe just like, stating education level or something)
+	3. a mini IQ test 
+	4. a self reported test for physical fitness behavior and abilities (max lift, run speeds, run times, other physical abilities)
+	5. a self reported mental health assesment
+	6. an uploaded photo to act as a high dimensional vector to represent the 'physical appearence' of the user, they can upload more and more photos to get a more 'acurate vector'. similar to how textual embeddings relate WORDS to each other, this will attempt to be a model to relate facial features and other physical appearences to each other (not just stats though)
+	7. social skills abilities (self reported)
+	8. experience (age plus some general XP thing)
+	9. Abstract Representation (will get to this later)
+4. then for the real structure: GOALS and ACTIONS and EVENTS
+
+so every ACTION requires a specific set of stats in order for it to succeed
+success is an axis as well, you can have partial success, or complete failure, or some sort of NEGATIVE progress (float between -1, 0, and 1)
+An ACTION also is on some sort of branch for a goal.
+ACTIONs also build stats, and give you something (boost social stats, or idk).
+
+So a user will select and action, and claim they have done it, and give themselves a success rating on that action. did they fail, succeed, or get worse?
+
+For example, the ACTION of "talk to girl at supermarket"
+- -1 would be the girl absolutely hates you now
+- 0 is nothing happens, girl has a boyfriend, or just not interested
+- 1 is girl gets their phone number
+
+Now i mentioned ACTIONS have prerequisites for success. we don't know these! that's a big thing of the app. we don't know what stats would allow for success. that's the point, we're trying to figure it out together!
+
+GOALS are also abstract, and it assume that a series of actions and events will accomplish a goal, but we don't know what that path is, what's an optimal path, etc.
+similar to skill trees in many video games, I would want "goals" to sort of be laid out like a DYNAMIC skill tree.
+
+Events are 'things that happen outside your control.' you didn't CHOOSE for the thing to happen, its a thing that happen to you. such as a girl walks up to talk to YOU and then you do it well and she gives you her number. that's an event. however, events are very similar to actions, because we assume that some stats are needed for certain events to occur.
+
+Overall, another big thing about this application is the multi-user aspect of it. it assumes (and will only really work) if a bunch of people are using this app, and everyone is trying to do a similar goal of "getting a girlfriend."
+
+Some other ideas im tossing over:
+- social interactions could be seen as BATTLES, not just actions. you can use skills and abilities here like "compliment" or something. however, i think this would be trying to put too much structure on something SUPER abstract. having a social interaction be an abstract ACTION makes more sense, less things to keep track of, easier to log and record
+- ITEMS are a thing i would very much LIKE in this, but doesn't make much sense. i guess a house vs a rented apartment, but i think this would get too specific

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+frontend/node_modules/
+frontend/dist/
+*.onnx
+ml/synthetic/output/
