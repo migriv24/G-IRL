@@ -335,6 +335,26 @@ def build_political_prompt(node_data: dict) -> str:
     return f"Political views: {political_to_words(x, y)}."
 
 
+def build_voice_prompt(node_data: dict) -> str:
+    """Build a prompt fragment from a Voice/Mindset node's data dict."""
+    parts = []
+    locus = node_data.get("locus", "")
+    tone  = node_data.get("emotional_tone", "")
+    aware = node_data.get("self_awareness", "")
+    if locus:
+        desc = (
+            "internalising (blames self, reflects on own failures)"
+            if "internal" in locus.lower()
+            else "externalising (attributes outcomes to others or circumstance)"
+        )
+        parts.append(f"Psychological locus: {desc}.")
+    if tone:
+        parts.append(f"Emotional tone: {tone}.")
+    if aware:
+        parts.append(f"Self-awareness level: {aware}.")
+    return " ".join(parts)
+
+
 def build_mbti_prompt(node_data: dict, selected_type: str | None = None) -> str:
     """Build a prompt fragment from a Myers-Briggs node.
 
@@ -356,3 +376,122 @@ def build_mbti_prompt(node_data: dict, selected_type: str | None = None) -> str:
 
     type_list = ", ".join(selected)
     return f"Myers-Briggs type is one of: {type_list}."
+
+
+# ── Full persona context builder ──────────────────────────────────────────────
+
+def build_full_persona_context(
+    spec,           # JourneySpec — imported lazily to avoid circular deps
+    phase,          # PhaseSpec
+    outcome: float,
+    persona_index: int,
+    n_total: int,
+    mbti_type: str | None = None,
+) -> str:
+    """Assemble a complete LLM prompt context for one persona + phase combination.
+
+    Draws on every node layer present in the JourneySpec, converting all
+    numerical values to descriptive words via the build_*_prompt helpers.
+    Layers that are absent (None) are silently omitted — minimal canvases
+    work without noise.
+
+    Output format: labeled sections separated by blank lines. This structure
+    helps the LLM attend to each layer distinctly rather than treating the
+    context as a single dense blob.
+
+    Args:
+        spec:          Compiled JourneySpec for this run.
+        phase:         The PhaseSpec this persona is currently in.
+        outcome:       Sampled outcome float (-1.0 to +1.0).
+        persona_index: 1-based index within the run.
+        n_total:       Total personas being generated.
+        mbti_type:     Randomly-drawn MBTI type for this persona, or None.
+
+    Returns:
+        A structured multi-section prompt string ready for LLM injection.
+    """
+    sections: list[str] = []
+
+    # ── Section 1: Situation ──────────────────────────────────────────────────
+    situation: list[str] = [f"[SITUATION — persona {persona_index}/{n_total}]"]
+
+    if spec.goal:
+        horizon_note = f"  horizon: {spec.horizon}" if spec.horizon else ""
+        situation.append(f"Goal: {spec.goal}{horizon_note}")
+
+    phase_line = f"Life phase: {phase.phase_type}"
+    if phase.duration:
+        phase_line += f"  ({phase.duration})"
+    if phase.action_frequency:
+        phase_line += f"  |  frequency: {phase.action_frequency}"
+    situation.append(phase_line)
+
+    outcome_desc = (
+        "complete failure or rejection"   if outcome < -0.3
+        else "neutral / nothing happened"  if outcome < 0.3
+        else "partial success"             if outcome < 0.7
+        else "clear success"
+    )
+    situation.append(f"Action outcome: {outcome_desc}")
+
+    sections.append("\n".join(situation))
+
+    # ── Section 2: Character profile ─────────────────────────────────────────
+    profile: list[str] = ["[CHARACTER PROFILE]"]
+    added_profile = False
+
+    if spec.archetype:
+        ap = build_archetype_prompt(spec.archetype)
+        if ap:
+            profile.append(ap)
+            added_profile = True
+
+    if spec.ocean:
+        op = build_ocean_prompt(spec.ocean)
+        if op:
+            profile.append(op)
+            added_profile = True
+
+    if spec.mbti:
+        mp = build_mbti_prompt(spec.mbti, selected_type=mbti_type)
+        if mp:
+            profile.append(mp)
+            added_profile = True
+
+    if added_profile:
+        sections.append("\n".join(profile))
+
+    # ── Section 3: Worldview ──────────────────────────────────────────────────
+    worldview: list[str] = ["[WORLDVIEW]"]
+    added_worldview = False
+
+    if spec.philosophy:
+        pp = build_philosophy_prompt(spec.philosophy)
+        if pp:
+            worldview.append(pp)
+            added_worldview = True
+
+    if spec.religion:
+        rp = build_religion_prompt(spec.religion)
+        if rp:
+            worldview.append(rp)
+            added_worldview = True
+
+    if spec.political:
+        polp = build_political_prompt(spec.political)
+        if polp:
+            worldview.append(polp)
+            added_worldview = True
+
+    if added_worldview:
+        sections.append("\n".join(worldview))
+
+    # ── Section 4: Voice & mindset ────────────────────────────────────────────
+    # Phase-level voice override takes precedence over journey-level default.
+    active_voice = phase.voice_override if phase.voice_override is not None else spec.voice
+    if active_voice:
+        vp = build_voice_prompt(active_voice)
+        if vp:
+            sections.append(f"[VOICE & MINDSET]\n{vp}")
+
+    return "\n\n".join(sections)

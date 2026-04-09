@@ -17,14 +17,17 @@ APP_DIR: Path = Path.home() / ".girl"
 
 # Subdirectories
 PROJECTS_DIR: Path = APP_DIR / "projects"
+CANVAS_DIR:   Path = APP_DIR / "canvas"
 
 # Top-level config file
-CONFIG_FILE: Path = APP_DIR / "config.json"
+CONFIG_FILE:    Path = APP_DIR / "config.json"
+CURRENT_CANVAS: Path = CANVAS_DIR / "current.journey.json"
 
 
 def ensure_dirs() -> None:
     """Create all required directories if they don't exist."""
     PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+    CANVAS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def project_path(project_id: str) -> Path:

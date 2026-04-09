@@ -66,3 +66,14 @@ class OllamaProvider(BaseProvider):
         except Exception as e:
             logger.warning(f"[Ollama] Health check failed: {e}")
             return False
+
+    async def list_models(self) -> list[str]:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.get(f"{self.config.base_url}/api/tags")
+                resp.raise_for_status()
+                models = resp.json().get("models", [])
+                return [m["name"] for m in models]
+        except Exception as e:
+            logger.warning(f"[Ollama] list_models failed: {e}")
+            return []

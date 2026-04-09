@@ -357,6 +357,88 @@ async def websocket_endpoint(ws: WebSocket):
                 except Exception as e:
                     await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Rename failed: {e}"}}))
 
+            # ── Canvas: auto-save ─────────────────────────────────────────
+            elif msg_type == "canvas.autosave":
+                p = msg.get("payload", {})
+                try:
+                    from backend.modules.canvas_manager import save_canvas
+                    save_canvas(p.get("nodes", []), p.get("edges", []))
+                    # Intentionally no response — fire-and-forget
+                except Exception as e:
+                    logger.error(f"[canvas.autosave] {e}")
+
+            # ── Canvas: load ──────────────────────────────────────────────
+            elif msg_type == "canvas.load":
+                try:
+                    from backend.modules.canvas_manager import load_canvas
+                    canvas = load_canvas()
+                    await ws.send_text(json.dumps({"event": "canvas.loaded", "payload": canvas}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"canvas.load failed: {e}"}}))
+
+            # ── Models: list ─────────────────────────────────────────────
+            elif msg_type == "models.list":
+                try:
+                    models = await provider_manager.active.list_models()
+                    await ws.send_text(json.dumps({"event": "models.list", "payload": {
+                        "provider": provider_manager.active_name,
+                        "models":   models,
+                    }}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"models.list failed: {e}"}}))
+
+            # ── Journey: run ─────────────────────────────────────────────
+            elif msg_type == "journey.run":
+                p = msg.get("payload", {})
+                try:
+                    from backend.modules.canvas_manager import load_canvas
+                    from backend.modules.journey_compiler import compile as compile_journey
+                    from backend.modules.providers import ProviderConfig
+                    from backend.modules.samples_db import new_run
+                    from backend.commands.generate import generate_from_spec
+
+                    # Source of truth: the saved canvas file, not in-memory React state
+                    canvas = load_canvas()
+
+                    spec = compile_journey(
+                        nodes     = canvas["nodes"],
+                        edges     = canvas["edges"],
+                        overrides = {
+                            "n_personas": p.get("n_personas", 3),
+                            "provider":   p.get("provider", "ollama"),
+                            "model":      p.get("model", "llama3.2:1b"),
+                        },
+                    )
+
+                    # Switch provider if requested
+                    if spec.provider and spec.provider != provider_manager.active_name:
+                        cfg = ProviderConfig(name=spec.provider, model=spec.model or '')
+                        provider_manager.add_provider(cfg)
+                        provider_manager.set_active(spec.provider)
+
+                    health = await provider_manager.active.health_check()
+                    if not health:
+                        await ws.send_text(json.dumps({"event": "error", "payload": {
+                            "message": f"Provider '{provider_manager.active.name}' is not reachable."
+                        }}))
+                    else:
+                        run_id = new_run(
+                            provider_manager.active.name,
+                            getattr(provider_manager.active, 'model', ''),
+                            spec.n_personas,
+                            spec.goal,
+                        )
+                        asyncio.create_task(generate_from_spec(spec, run_id))
+                        await ws.send_text(json.dumps({"event": "journey.run.started", "payload": {
+                            "run_id":     run_id,
+                            "n_personas": spec.n_personas,
+                            "goal":       spec.goal,
+                            "phases":     [ph.phase_type for ph in spec.phases],
+                        }}))
+                except Exception as e:
+                    logger.error(f"[journey.run] {e}")
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Journey run failed: {e}"}}))
+
             # ── User config: get ──────────────────────────────────────────
             elif msg_type == "user.config.get":
                 try:

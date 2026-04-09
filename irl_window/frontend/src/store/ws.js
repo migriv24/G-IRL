@@ -100,6 +100,16 @@ const useWsStore = create((set, get) => ({
     socket.send(JSON.stringify({ type, payload }));
     return true;
   },
+
+  /** Fire subscribers locally without sending to the backend.
+   *  Used for UI-only events like node saves that don't need a round-trip. */
+  pushEvent(type, payload = {}) {
+    const subs = get()._subscribers;
+    const handlers = [...(subs[type] ?? []), ...(subs['*'] ?? [])];
+    handlers.forEach((fn) => {
+      try { fn(type, payload); } catch (err) { console.error('[pushEvent]', err); }
+    });
+  },
 }));
 
 export default useWsStore;

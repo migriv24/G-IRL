@@ -13,9 +13,10 @@
  * for personality trait prompting in LLMs (PersonaLLM, 2024).
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Handle, Position, useReactFlow, NodeResizer } from '@xyflow/react';
 import useWsStore from '../../store/ws';
+import { compileJourney } from './compileJourney';
 
 // ── Win95 primitives ──────────────────────────────────────────────────────────
 
@@ -344,7 +345,9 @@ function MBTIGrid({ selected, onToggle }) {
 
 function Win95Window({ id, icon, title, accentColor, handles, children, editChildren, extraStyle }) {
   const [windowState, setWindowState] = useState('normal');
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, getNodes, getEdges } = useReactFlow();
+  const pushEvent   = useWsStore(s => s.pushEvent);
+  const sendMessage = useWsStore(s => s.sendMessage);
 
   const toggle = target => setWindowState(s => s === target ? 'normal' : target);
   const onClose = () => deleteElements({ nodes: [{ id }] });
@@ -394,7 +397,22 @@ function Win95Window({ id, icon, title, accentColor, handles, children, editChil
             border: '1px solid',
             borderColor: 'var(--bevel-outer-br) var(--bevel-tl) var(--bevel-tl) var(--bevel-outer-br)',
           }} />
-          {isMax ? editChildren : children}
+          {isMax ? (
+            <>
+              {editChildren}
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--bevel-br)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    sendMessage('canvas.autosave', { nodes: getNodes(), edges: getEdges() });
+                    pushEvent('node.saved', { title });
+                  }}
+                  style={{ fontSize: 11, minWidth: 60 }}
+                >
+                  💾 Save
+                </button>
+              </div>
+            </>
+          ) : children}
         </div>
       )}
 
@@ -812,27 +830,68 @@ export function EventNode({ id, data }) {
 
 // ── Generate Node ─────────────────────────────────────────────────────────────
 export function GenerateNode({ id, data }) {
-  const { updateNodeData } = useReactFlow();
-  const { sendCommand, connected } = useWsStore();
+  const { updateNodeData, getNodes, getEdges } = useReactFlow();
+  const { sendMessage, onEvent, connected } = useWsStore();
   const upd = (k, v) => updateNodeData(id, { [k]: v });
   const n = data.n_personas ?? 3;
 
+  const [availableModels, setAvailableModels] = useState([]);
+
+  // Fetch installed models whenever the edit panel opens (via focus on the select)
+  const fetchModels = useCallback(() => {
+    if (!connected) return;
+    sendMessage('models.list');
+  }, [connected, sendMessage]);
+
+  // Subscribe to models.list response
+  useEffect(() => {
+    const unsub = onEvent('models.list', (_evt, payload) => {
+      if (payload.models?.length) setAvailableModels(payload.models);
+    });
+    return unsub;
+  }, [onEvent]);
+
   const handleGenerate = () => {
     if (!connected) return;
-    sendCommand(`generate ${n} --provider ${data.provider ?? 'ollama'} --model ${data.model ?? 'llama3.2:1b'}`);
+    const journey = compileJourney(getNodes(), getEdges());
+    sendMessage('journey.run', {
+      ...journey,
+      n_personas: n,
+      provider:   data.provider ?? 'ollama',
+      model:      data.model    ?? 'llama3.2:1b',
+    });
   };
+
+  const currentModel = data.model ?? 'llama3.2:1b';
 
   return (
     <Win95Window id={id} icon="▶" title="Generate" accentColor="#007700" handles={{ left: true }}
       editChildren={<>
         <EditField label="N Personas" value={n}             onChange={v => upd('n_personas', Number(v))} type="number" />
         <EditField label="Provider"   value={data.provider} onChange={v => upd('provider', v)} />
-        <EditField label="Model"      value={data.model}    onChange={v => upd('model', v)} />
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11, marginBottom: 2 }}>Model:</div>
+          <select
+            value={currentModel}
+            onChange={e => upd('model', e.target.value)}
+            onFocus={fetchModels}
+            className="nodrag nopan"
+            style={{ width: '100%', fontSize: 11 }}
+          >
+            {/* Always show the current model even if list hasn't loaded */}
+            {!availableModels.includes(currentModel) && (
+              <option value={currentModel}>{currentModel}</option>
+            )}
+            {availableModels.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
       </>}
     >
       <Field label="personas" value={n} />
       <Field label="provider" value={data.provider ?? 'ollama'} />
-      <Field label="model"    value={data.model ?? 'llama3.2:1b'} />
+      <Field label="model"    value={currentModel} />
       <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--bevel-br)', display: 'flex', justifyContent: 'center' }}>
         <button
           onClick={handleGenerate}

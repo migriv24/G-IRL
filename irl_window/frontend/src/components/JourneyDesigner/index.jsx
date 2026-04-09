@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ReactFlow, Background, Controls, MiniMap,
   addEdge, useNodesState, useEdgesState,
@@ -230,7 +230,7 @@ export default function JourneyDesigner() {
 
   const { pushSnapshot, undo, redo, canUndo, canRedo } = useHistoryStore();
   const { setSelectedNode, clearSelection } = useInspectorStore();
-  const { sendMessage, onEvent, connected } = useWsStore();
+  const { sendMessage, onEvent, pushEvent, connected } = useWsStore();
 
   const {
     id: projectId, name, isDirty,
@@ -238,11 +238,42 @@ export default function JourneyDesigner() {
     pendingLoad, clearPendingLoad, newProject,
   } = useProjectStore();
 
+  // ── Auto-save debounce ref ─────────────────────────────────────────────
+  const autoSaveTimer = useRef(null);
+
+  const flushCanvasToFile = useCallback((ns, es) => {
+    sendMessage('canvas.autosave', { nodes: ns, edges: es });
+  }, [sendMessage]);
+
+  const scheduleAutoSave = useCallback((ns, es) => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => flushCanvasToFile(ns, es), 500);
+  }, [flushCanvasToFile]);
+
+  // ── Load canvas from file on first mount ──────────────────────────────
+  const canvasLoadedRef = useRef(false);
+  useEffect(() => {
+    if (canvasLoadedRef.current) return;
+    canvasLoadedRef.current = true;
+    const unsub = onEvent('canvas.loaded', (_, payload) => {
+      if (payload.nodes?.length || payload.edges?.length) {
+        setNodes(payload.nodes ?? []);
+        setEdges(payload.edges ?? []);
+      }
+      unsub();
+    });
+    sendMessage('canvas.load');
+    return unsub;
+  }, []);
+
   // ── Apply loaded project from backend ─────────────────────────────────
   useEffect(() => {
     if (!pendingLoad) return;
-    setNodes(pendingLoad.nodes);
-    setEdges(pendingLoad.edges);
+    const ns = pendingLoad.nodes;
+    const es = pendingLoad.edges;
+    setNodes(ns);
+    setEdges(es);
+    flushCanvasToFile(ns, es); // persist the loaded project as the working canvas
     clearPendingLoad();
   }, [pendingLoad]);
 
@@ -295,6 +326,7 @@ export default function JourneyDesigner() {
     if (!connected) { showToast('⚠ Backend offline'); return; }
     // First save — no project ID yet; ask for a name
     if (!projectId) { setNameDialog({ mode: 'save' }); return; }
+    flushCanvasToFile(nodes, edges); // guarantee file is current before named save
     sendMessage('project.save', {
       id: projectId,
       name,
@@ -302,7 +334,11 @@ export default function JourneyDesigner() {
       edges,
       description: useProjectStore.getState().description,
     });
-  }, [connected, projectId, name, nodes, edges, sendMessage]);
+    // Broadcast a save event for every non-frame node so the terminal confirms each
+    nodes
+      .filter(n => n.type && n.type !== 'frame')
+      .forEach(n => pushEvent('node.saved', { title: n.type }));
+  }, [connected, projectId, name, nodes, edges, sendMessage, pushEvent, flushCanvasToFile]);
 
   // ── New project ────────────────────────────────────────────────────────
   const handleNew = useCallback(() => {
@@ -335,6 +371,15 @@ export default function JourneyDesigner() {
     markDirty();
     setEdges(eds => addEdge(params, eds));
   }, [nodes, edges, pushSnapshot, setEdges, markDirty]);
+
+  // ── Auto-save fires AFTER React commits new state ─────────────────────
+  // Using a useEffect that watches nodes/edges directly — not the change
+  // handlers — guarantees we always write the post-update values to disk.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    scheduleAutoSave(nodes, edges);
+  }, [nodes, edges]);
 
   // ── Sync canvas state for terminal / other consumers ──────────────────
   useEffect(() => {

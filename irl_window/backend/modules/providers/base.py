@@ -38,3 +38,9 @@ class BaseProvider(ABC):
     async def health_check(self) -> bool:
         """Returns True if provider is reachable and ready."""
         ...
+
+    async def list_models(self) -> list[str]:
+        """Return installed/available model names for this provider.
+        Override in providers that support model enumeration.
+        """
+        return []

@@ -168,6 +168,9 @@ function OutputEntry({ entry }) {
     if (out.type === 'text')   return <div style={{ color: '#ccffcc', whiteSpace: 'pre-wrap' }}>{out.text}</div>;
     return <pre style={{ color: '#aaffaa', fontSize: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(out, null, 2)}</pre>;
   }
+  if (entry.type === 'node_save') {
+    return <div style={{ color: '#cc88ff', fontSize: 11, fontFamily: 'var(--font-mono)' }}>[{entry.title}] SAVED</div>;
+  }
   if (entry.type === 'nav') {
     return <div style={{ color: '#4488cc', fontSize: 11, fontStyle: 'italic' }}>  → {entry.text}</div>;
   }
@@ -224,7 +227,10 @@ export default function CommandTerminal({ activeTab }) {
     const u5 = onEvent('generate.complete', (_, p) =>
       setHistory(h => [...h, { type: 'event', event: 'GEN', text: `Done. Generated ${p.n} personas.` }])
     );
-    return () => { u1(); u2(); u3(); u4(); u5(); };
+    const u6 = onEvent('node.saved', (_, p) =>
+      setHistory(h => [...h, { type: 'node_save', title: p.title }])
+    );
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
   }, [onEvent]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'auto' }); }, [history]);

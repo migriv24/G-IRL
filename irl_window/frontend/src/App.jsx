@@ -190,10 +190,12 @@ function MainCanvas({ activeTab }) {
       icon={TABS.find(t => t.id === activeTab)?.icon}
       style={{ flex: 1, borderLeft: 'none', borderTop: 'none', borderBottom: 'none' }}
     >
+      {/* All three panels stay mounted — CSS display:none instead of unmount.
+          This preserves React Flow's internal state across tab switches. */}
       <Suspense fallback={<PlaceholderPanel label="Loading..." />}>
-        {activeTab === 'journey' && <JourneyDesigner />}
-        {activeTab === 'samples' && <SampleViewer />}
-        {activeTab === 'model'   && <ModelLab />}
+        <div style={{ display: activeTab === 'journey' ? 'contents' : 'none' }}><JourneyDesigner /></div>
+        <div style={{ display: activeTab === 'samples' ? 'contents' : 'none' }}><SampleViewer /></div>
+        <div style={{ display: activeTab === 'model'   ? 'contents' : 'none' }}><ModelLab /></div>
       </Suspense>
     </Panel>
   );
