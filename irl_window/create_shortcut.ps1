@@ -1,40 +1,39 @@
 # Creates a desktop shortcut that launches IRL_Window and opens the browser.
 # Run once: right-click -> "Run with PowerShell"
 
-$ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$StartScript = Join-Path $ProjectDir "start.bat"
-$IconPath    = Join-Path $ProjectDir "irl_window.ico"
+$ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir        # G-IRL/
+$StartScript = Join-Path $ScriptDir "start.bat"
+$IconPath    = Join-Path $ProjectRoot "assets\icon.ico"
 $ShortcutPath = [System.IO.Path]::Combine(
     [Environment]::GetFolderPath("Desktop"),
     "IRL_Window.lnk"
 )
 
-# Download a simple icon if none exists (uses PowerShell's built-in web client)
-# Falls back to the default cmd icon if this fails — no big deal
 if (-not (Test-Path $IconPath)) {
-    try {
-        # Use the Python executable icon as a reasonable stand-in
-        $PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
-        if ($PythonExe) { $IconPath = $PythonExe }
-    } catch {}
+    Write-Warning "Icon not found at: $IconPath"
+    Write-Warning "Shortcut will use default icon."
+    $IconPath = $null
 }
 
 $WScriptShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WScriptShell.CreateShortcut($ShortcutPath)
-$Shortcut.TargetPath      = $StartScript
-$Shortcut.WorkingDirectory = $ProjectDir
-$Shortcut.Description     = "Launch IRL_Window (backend + frontend)"
-$Shortcut.WindowStyle     = 1   # Normal window
+$Shortcut.TargetPath       = $StartScript
+$Shortcut.WorkingDirectory = $ScriptDir
+$Shortcut.Description      = "IRL_Window - Synthetic Data Platform"
+$Shortcut.WindowStyle      = 1   # Normal window
 
-if (Test-Path $IconPath) {
+if ($IconPath) {
     $Shortcut.IconLocation = "$IconPath,0"
 }
 
 $Shortcut.Save()
 
 Write-Host ""
-Write-Host "Shortcut created at: $ShortcutPath" -ForegroundColor Green
+Write-Host "Desktop shortcut created: $ShortcutPath" -ForegroundColor Green
+Write-Host "Icon:  $IconPath" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Double-click 'IRL_Window' on your desktop to start." -ForegroundColor Cyan
-Write-Host "It will open two terminal windows (backend + frontend) then navigate to http://localhost:5173" -ForegroundColor Cyan
+Write-Host "Opens backend (port 8000) + frontend (port 5173) + browser." -ForegroundColor Cyan
+
 Write-Host ""

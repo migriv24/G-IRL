@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import useWsStore from './store/ws';
 import useSettingsStore from './store/settings';
+import useProjectStore from './store/project';
 import StatusBar from './components/StatusBar';
 import CommandTerminal from './components/CommandTerminal';
 import NodeInspector from './components/NodeInspector';
@@ -42,6 +43,7 @@ function MenuTab({ label, active, onClick }) {
 
 // ── App title bar ─────────────────────────────────────────────────────────────
 function AppTitleBar() {
+  const { name, isDirty } = useProjectStore();
   return (
     <div style={{
       background: 'var(--titlebar-active)',
@@ -58,11 +60,20 @@ function AppTitleBar() {
         fontFamily: 'var(--font-pixel)',
         fontSize: 14,
         letterSpacing: '0.05em',
+      }}>
+        IRL_Window
+      </span>
+      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>—</span>
+      <span style={{
+        color: isDirty ? '#ffd080' : 'rgba(255,255,255,0.85)',
+        fontFamily: 'var(--font-pixel)',
+        fontSize: 11,
+        letterSpacing: '0.03em',
         flex: 1,
       }}>
-        IRL_Window v0.1
+        {name}{isDirty ? ' *' : ''}
       </span>
-      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontFamily: 'var(--font-mono)' }}>
+      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: 'var(--font-mono)' }}>
         Synthetic Data Platform
       </span>
     </div>
@@ -189,7 +200,7 @@ function MainCanvas({ activeTab }) {
 }
 
 // ── Right sidebar ─────────────────────────────────────────────────────────────
-function RightSidebar() {
+function RightSidebar({ activeTab }) {
   return (
     <div style={{
       width: 290,
@@ -213,7 +224,7 @@ function RightSidebar() {
         icon="📟"
         style={{ flex: 1 }}
       >
-        <CommandTerminal />
+        <CommandTerminal activeTab={activeTab} />
       </Panel>
     </div>
   );
@@ -243,7 +254,7 @@ export default function App() {
       {/* Main content row — fills remaining height, never overflows */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         <MainCanvas activeTab={activeTab} />
-        <RightSidebar />
+        <RightSidebar activeTab={activeTab} />
       </div>
 
       <StatusBar />

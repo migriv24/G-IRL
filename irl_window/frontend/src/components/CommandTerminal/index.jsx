@@ -1,8 +1,125 @@
-/** Win95 CMD.exe style terminal */
+/** Win95 CMD.exe style terminal — context-aware, filesystem metaphor.
+ *
+ * Directory model:
+ *   C:\IRL           — root (list of sections)
+ *   C:\IRL\JD        — Journey Designer  (ls lists nodes)
+ *   C:\IRL\S         — Samples           (ls lists sample count)
+ *   C:\IRL\ML        — Model Lab
+ *
+ * Tab switches in the UI push a path change here via the activeTab prop.
+ * The terminal can also be navigated independently with `cd`.
+ * Everything not matched locally is forwarded to the backend.
+ */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useWsStore from '../../store/ws';
+import useProjectStore from '../../store/project';
+import useCanvasStore from '../../store/canvas';
 
-function TableOutput({ columns, rows }) {
+// ── Path helpers ─────────────────────────────────────────────────────────────
+
+const TAB_TO_PATH = {
+  journey: 'C:\\IRL\\JD',
+  samples: 'C:\\IRL\\S',
+  model:   'C:\\IRL\\ML',
+};
+
+const PATH_SECTIONS = {
+  'C:\\IRL':    { dirs: ['JD', 'S', 'ML'], desc: 'IRL root' },
+  'C:\\IRL\\JD': { dirs: [],               desc: 'Journey Designer' },
+  'C:\\IRL\\S':  { dirs: [],               desc: 'Samples' },
+  'C:\\IRL\\ML': { dirs: [],               desc: 'Model Lab' },
+};
+
+function resolvePath(current, input) {
+  if (!input || input === '.') return current;
+  if (input === '..') {
+    const parts = current.split('\\');
+    return parts.length > 2 ? parts.slice(0, -1).join('\\') : current;
+  }
+  // Absolute path shorthand e.g. 'JD', 'S', 'ML' or full path
+  const upper = input.toUpperCase();
+  const mapped = {
+    JD:  'C:\\IRL\\JD',
+    S:   'C:\\IRL\\S',
+    ML:  'C:\\IRL\\ML',
+    IRL: 'C:\\IRL',
+  };
+  if (mapped[upper]) return mapped[upper];
+  // Full path typed
+  const candidate = input.startsWith('C:\\') ? input : `${current}\\${input}`;
+  return PATH_SECTIONS[candidate] ? candidate : null; // null = not found
+}
+
+// ── ls output per context ────────────────────────────────────────────────────
+
+function lsOutput(path) {
+  if (path === 'C:\\IRL') {
+    return {
+      type: 'table',
+      columns: ['DIR', 'DESCRIPTION'],
+      rows: [
+        ['JD',  'Journey Designer — node canvas'],
+        ['S',   'Samples — generated persona logs'],
+        ['ML',  'Model Lab — LLM provider config'],
+      ],
+    };
+  }
+
+  if (path === 'C:\\IRL\\JD') {
+    const { nodes, edges } = useCanvasStore.getState();
+    const { name } = useProjectStore.getState();
+    if (nodes.length === 0) {
+      return { type: 'text', text: `Journey "${name}" — no nodes loaded.` };
+    }
+    const rows = nodes.map(n => [
+      n.id,
+      n.type,
+      n.type === 'frame'
+        ? `[group: ${nodes.filter(c => c.parentId === n.id).length} nodes]`
+        : `(${Math.round(n.position.x)}, ${Math.round(n.position.y)})`,
+    ]);
+    return {
+      type: 'table',
+      columns: ['ID', 'TYPE', 'POS / INFO'],
+      rows,
+      header: `Journey: ${name}  |  ${nodes.length} nodes, ${edges.length} edges`,
+    };
+  }
+
+  if (path === 'C:\\IRL\\S') {
+    return { type: 'text', text: 'Samples panel — use the Samples tab to browse generated logs.' };
+  }
+
+  if (path === 'C:\\IRL\\ML') {
+    return { type: 'text', text: 'Model Lab — use the Model Lab tab to configure providers.' };
+  }
+
+  return { type: 'text', text: `No listing available for ${path}` };
+}
+
+// ── Help text ────────────────────────────────────────────────────────────────
+
+const HELP_TEXT = `Available commands:
+  ls              List contents of current directory
+  cd <dir>        Change directory (JD / S / ML / ..)
+  pwd             Print current path
+  clear           Clear terminal
+  help            Show this help
+
+Journey Designer (C:\\IRL\\JD):
+  add <type>      Add a node (e.g. add phase)
+  generate <n>    Run persona generation
+  save            Save current journey
+  load <name>     Load a journey
+
+Keyboard shortcuts (canvas):
+  Shift+drag      Box-select multiple nodes
+  Ctrl+click      Add node to selection
+  Shift+A         Group selected nodes into a frame`;
+
+// ── Output renderers ─────────────────────────────────────────────────────────
+
+function TableOutput({ header, columns, rows }) {
   const colWidths = columns.map((col, i) =>
     Math.max(col.length, ...rows.map(r => String(r[i] ?? '').length))
   );
@@ -11,6 +128,7 @@ function TableOutput({ columns, rows }) {
 
   return (
     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.7 }}>
+      {header && <div style={{ color: '#88bbdd', marginBottom: 2 }}>{header}</div>}
       <div style={{ color: '#aaffaa' }}>
         {'│'}{columns.map((c, i) => ` ${pad(c, colWidths[i])} │`).join('')}
       </div>
@@ -18,8 +136,9 @@ function TableOutput({ columns, rows }) {
       {rows.map((row, ri) => (
         <div key={ri} style={{ color: '#ccffcc' }}>
           {'│'}{row.map((cell, ci) => {
-            const highlight = cell === 'ACTIVE' ? '#00ff00' : cell === 'UNREACHABLE' ? '#ff4444' : cell === 'OK' ? '#00ff00' : '#ccffcc';
-            return <span key={ci} style={{ color: highlight }}>{` ${pad(cell, colWidths[ci])} │`}</span>;
+            const s = String(cell ?? '');
+            const color = s === 'ACTIVE' ? '#00ff00' : s === 'UNREACHABLE' ? '#ff4444' : s === 'OK' ? '#00ff00' : '#ccffcc';
+            return <span key={ci} style={{ color }}>{` ${pad(s, colWidths[ci])} │`}</span>;
           })}
         </div>
       ))}
@@ -34,7 +153,7 @@ function OutputEntry({ entry }) {
   if (entry.type === 'input') {
     return (
       <div style={{ color: '#ffffff' }}>
-        <span style={{ color: '#00ff00' }}>C:\IRL&gt; </span>{entry.text}
+        <span style={{ color: '#00ff00' }}>{entry.prompt} </span>{entry.text}
       </div>
     );
   }
@@ -45,26 +164,50 @@ function OutputEntry({ entry }) {
     if (entry.error) return <div style={{ color: '#ff4444' }}>ERROR: {entry.error}</div>;
     const out = entry.output;
     if (!out) return null;
-    if (out.type === 'table') return <div style={{ overflowX: 'auto', maxWidth: '100%' }}><TableOutput columns={out.columns} rows={out.rows} /></div>;
-    if (out.type === 'text') return <div style={{ color: '#ccffcc' }}>{out.text}</div>;
+    if (out.type === 'table')  return <div style={{ overflowX: 'auto', maxWidth: '100%' }}><TableOutput header={out.header} columns={out.columns} rows={out.rows} /></div>;
+    if (out.type === 'text')   return <div style={{ color: '#ccffcc', whiteSpace: 'pre-wrap' }}>{out.text}</div>;
     return <pre style={{ color: '#aaffaa', fontSize: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(out, null, 2)}</pre>;
+  }
+  if (entry.type === 'nav') {
+    return <div style={{ color: '#4488cc', fontSize: 11, fontStyle: 'italic' }}>  → {entry.text}</div>;
   }
   return null;
 }
 
-export default function CommandTerminal() {
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function CommandTerminal({ activeTab }) {
   const [history, setHistory] = useState([
-    { type: 'system', text: 'IRL_Window Command Interface v0.1' },
+    { type: 'system', text: 'IRL_Window Command Interface v0.2' },
     { type: 'system', text: 'Type HELP for available commands.' },
     { type: 'system', text: '' },
   ]);
-  const [input, setInput]       = useState('');
-  const [histIdx, setHistIdx]   = useState(-1);
-  const [cmdHist, setCmdHist]   = useState([]);
-  const inputRef = useRef(null);
+  const [input,   setInput]   = useState('');
+  const [histIdx, setHistIdx] = useState(-1);
+  const [cmdHist, setCmdHist] = useState([]);
+  const [path,    setPath]    = useState('C:\\IRL\\JD');
+
+  const inputRef  = useRef(null);
   const bottomRef = useRef(null);
   const { connected, sendCommand, onEvent } = useWsStore();
 
+  const prompt = `${path}>`;
+
+  // ── Update path when the user switches tabs ──────────────────────────
+  const prevTabRef = useRef(activeTab);
+  useEffect(() => {
+    if (activeTab && activeTab !== prevTabRef.current) {
+      const newPath = TAB_TO_PATH[activeTab] ?? 'C:\\IRL';
+      prevTabRef.current = activeTab;
+      setPath(newPath);
+      setHistory(h => [...h, {
+        type: 'nav',
+        text: `Tab switched → ${newPath}`,
+      }]);
+    }
+  }, [activeTab]);
+
+  // ── Backend event listeners ───────────────────────────────────────────
   useEffect(() => {
     const u1 = onEvent('command.result', (_, p) =>
       setHistory(h => [...h, { type: 'result', output: p.output, error: p.error }])
@@ -86,19 +229,69 @@ export default function CommandTerminal() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'auto' }); }, [history]);
 
+  // ── Local command handler (intercepts before backend) ─────────────────
+  const handleLocalCommand = useCallback((cmd) => {
+    const parts = cmd.trim().split(/\s+/);
+    const verb  = parts[0].toLowerCase();
+    const arg   = parts.slice(1).join(' ');
+
+    if (verb === 'clear' || verb === 'cls') {
+      setHistory([{ type: 'system', text: 'Terminal cleared.' }, { type: 'system', text: '' }]);
+      return true;
+    }
+
+    if (verb === 'pwd') {
+      setHistory(h => [...h, { type: 'result', output: { type: 'text', text: path } }]);
+      return true;
+    }
+
+    if (verb === 'help') {
+      setHistory(h => [...h, { type: 'result', output: { type: 'text', text: HELP_TEXT } }]);
+      return true;
+    }
+
+    if (verb === 'cd') {
+      if (!arg) {
+        setHistory(h => [...h, { type: 'result', output: { type: 'text', text: path } }]);
+        return true;
+      }
+      const next = resolvePath(path, arg);
+      if (next === null) {
+        setHistory(h => [...h, { type: 'result', error: `Path not found: ${arg}` }]);
+      } else {
+        setPath(next);
+        setHistory(h => [...h, { type: 'result', output: { type: 'text', text: next } }]);
+      }
+      return true;
+    }
+
+    if (verb === 'ls' || verb === 'dir') {
+      const out = lsOutput(path);
+      setHistory(h => [...h, { type: 'result', output: out }]);
+      return true;
+    }
+
+    return false; // not handled locally → send to backend
+  }, [path]);
+
+  // ── Submit ────────────────────────────────────────────────────────────
   const submit = useCallback(() => {
     const cmd = input.trim();
     if (!cmd) return;
-    setHistory(h => [...h, { type: 'input', text: cmd }]);
+
+    setHistory(h => [...h, { type: 'input', text: cmd, prompt }]);
     setCmdHist(h => [cmd, ...h.slice(0, 99)]);
     setHistIdx(-1);
     setInput('');
+
+    if (handleLocalCommand(cmd)) return;
+
     if (!connected) {
       setHistory(h => [...h, { type: 'result', error: 'Not connected to backend.' }]);
       return;
     }
     sendCommand(cmd);
-  }, [input, connected, sendCommand]);
+  }, [input, prompt, connected, sendCommand, handleLocalCommand]);
 
   const onKeyDown = useCallback((e) => {
     if (e.key === 'Enter') { e.preventDefault(); submit(); }
@@ -126,7 +319,9 @@ export default function CommandTerminal() {
         gap: 4,
         background: '#000',
       }}>
-        <span style={{ color: '#00ff00', fontSize: 12, fontFamily: 'var(--font-mono)', flexShrink: 0 }}>C:\IRL&gt;</span>
+        <span style={{ color: '#00ff00', fontSize: 11, fontFamily: 'var(--font-mono)', flexShrink: 0, whiteSpace: 'nowrap' }}>
+          {prompt}
+        </span>
         <input
           ref={inputRef}
           value={input}

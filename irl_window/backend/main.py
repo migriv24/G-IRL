@@ -296,6 +296,89 @@ async def websocket_endpoint(ws: WebSocket):
                     {"input": cmd_input, "success": result.success}
                 )
 
+            # ── Project: save ─────────────────────────────────────────────
+            elif msg_type == "project.save":
+                from backend.modules.project_manager import save_project
+                p = msg.get("payload", {})
+                try:
+                    meta = save_project(
+                        name=p.get("name", "Untitled Journey"),
+                        nodes=p.get("nodes", []),
+                        edges=p.get("edges", []),
+                        description=p.get("description", ""),
+                        project_id=p.get("id"),
+                    )
+                    await ws.send_text(json.dumps({"event": "project.saved", "payload": meta}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Save failed: {e}"}}))
+
+            # ── Project: load ─────────────────────────────────────────────
+            elif msg_type == "project.load":
+                try:
+                    from backend.modules.project_manager import load_project
+                    project_id = msg.get("payload", {}).get("id")
+                    data = load_project(project_id) if project_id else None
+                    if data:
+                        await ws.send_text(json.dumps({"event": "project.loaded", "payload": data}))
+                    else:
+                        await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Project not found: {project_id}"}}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Load failed: {e}"}}))
+
+            # ── Project: list ─────────────────────────────────────────────
+            elif msg_type == "project.list":
+                try:
+                    from backend.modules.project_manager import list_projects
+                    projects = list_projects()
+                    await ws.send_text(json.dumps({"event": "project.list", "payload": {"projects": projects}}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"List failed: {e}"}}))
+
+            # ── Project: delete ───────────────────────────────────────────
+            elif msg_type == "project.delete":
+                try:
+                    from backend.modules.project_manager import delete_project
+                    project_id = msg.get("payload", {}).get("id")
+                    success = delete_project(project_id) if project_id else False
+                    await ws.send_text(json.dumps({"event": "project.deleted", "payload": {"id": project_id, "success": success}}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Delete failed: {e}"}}))
+
+            # ── Project: rename ───────────────────────────────────────────
+            elif msg_type == "project.rename":
+                try:
+                    from backend.modules.project_manager import rename_project
+                    p = msg.get("payload", {})
+                    meta = rename_project(p.get("id"), p.get("name", ""))
+                    if meta:
+                        await ws.send_text(json.dumps({"event": "project.renamed", "payload": meta}))
+                    else:
+                        await ws.send_text(json.dumps({"event": "error", "payload": {"message": "Project not found"}}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Rename failed: {e}"}}))
+
+            # ── User config: get ──────────────────────────────────────────
+            elif msg_type == "user.config.get":
+                try:
+                    from backend.modules.user_config import load_config
+                    cfg = load_config()
+                    await ws.send_text(json.dumps({"event": "user.config", "payload": cfg}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Config load failed: {e}"}}))
+
+            # ── User config: set ──────────────────────────────────────────
+            elif msg_type == "user.config.set":
+                try:
+                    from backend.modules.user_config import load_config, set_username
+                    updates = msg.get("payload", {})
+                    if "username" in updates:
+                        cfg = set_username(updates["username"])
+                    else:
+                        cfg = load_config()
+                    await ws.send_text(json.dumps({"event": "user.config", "payload": cfg}))
+                except Exception as e:
+                    await ws.send_text(json.dumps({"event": "error", "payload": {"message": f"Config save failed: {e}"}}))
+
             else:
                 await ws.send_text(json.dumps({
                     "event": "error",

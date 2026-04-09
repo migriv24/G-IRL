@@ -92,6 +92,14 @@ const useWsStore = create((set, get) => ({
     socket.send(JSON.stringify({ type: 'command', input }));
     return true;
   },
+
+  /** Send any typed message to the backend (project.save, user.config.get, etc.) */
+  sendMessage(type, payload = {}) {
+    const { socket, connected } = get();
+    if (!connected || !socket) return false;
+    socket.send(JSON.stringify({ type, payload }));
+    return true;
+  },
 }));
 
 export default useWsStore;

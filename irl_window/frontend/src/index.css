@@ -186,4 +186,7 @@ input:focus, textarea:focus {
   box-shadow: inset 1px 1px 0 var(--w95-white) !important;
 }
 .react-flow__node { border-radius: 0 !important; padding: 0 !important; background: none !important; border: none !important; box-shadow: none !important; }
-.react-flow__node.selected > * { outline: 1px dotted var(--w95-black); outline-offset: 2px; }
+.react-flow__node.selected > * { filter: drop-shadow(0 0 5px rgba(255, 215, 0, 1)) drop-shadow(0 0 12px rgba(255, 215, 0, 0.55)); }
+
+/* Selection box (rubber-band) */
+.react-flow__selection { background: rgba(255, 215, 0, 0.08) !important; border: 1px dashed rgba(255, 215, 0, 0.7) !important; }
